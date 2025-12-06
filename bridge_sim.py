@@ -29,6 +29,9 @@ def generate_bridge_data(scenario="normal"):
         vibration_z = round(random.uniform(0.31, 0.8), 4)
         strain = round(random.uniform(500, 1000), 2) # High microstrain
         tilt = round(random.uniform(2.0, 5.0), 2)     # Significant tilt
+        health_score = random.randint(45, 65)         # Critical Health
+        prediction_window = "45-60 days"
+        defect_type = "Early-stage Rebar Corrosion"
     else:
         # Normal values: low vibration, normal strain, negligible tilt
         vibration_x = round(random.uniform(0.001, 0.25), 4)
@@ -36,6 +39,9 @@ def generate_bridge_data(scenario="normal"):
         vibration_z = round(random.uniform(0.001, 0.25), 4)
         strain = round(random.uniform(10, 100), 2)
         tilt = round(random.uniform(-0.5, 0.5), 2)
+        health_score = random.randint(95, 100)        # Optimal Health
+        prediction_window = "None (Safe)"
+        defect_type = "None"
         
     data = {
         "timestamp": timestamp,
@@ -44,6 +50,9 @@ def generate_bridge_data(scenario="normal"):
         "vibration_z": vibration_z,
         "strain": strain,
         "tilt": tilt,
+        "health_score": health_score,
+        "prediction_window": prediction_window,
+        "defect_type": defect_type,
         "scenario": scenario
     }
     

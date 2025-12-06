@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bridge Digital Twin</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: monospace;
+            z-index: 100;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">Digital Twin Visualization<br>stress: <span id="stress-val">0</span> | vib: <span
+            id="vib-val">0</span></div>
+
+    <!-- Import Three.js from a CDN -->
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js';
+
+        // --- Data Injection Points (These will be replaced by Python) ---
+        const VIB_X = Number('{{VIB_X}}');
+        const VIB_Y = Number('{{VIB_Y}}');
+        const VIB_Z = Number('{{VIB_Z}}');
+        const STRESS = Number('{{STRESS}}');
+        const TILT = Number('{{TILT}}');
+
+        // Update UI Text
+        document.getElementById('stress-val').innerText = STRESS;
+        document.getElementById('vib-val').innerText = Math.max(VIB_X, VIB_Y, VIB_Z).toFixed(2);
+
+        // --- Scene Setup ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x222222); // Dark background
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(3, 3, 5);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // --- Lighting ---
+        const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+
+        // --- Bridge Pillar Geometry ---
+        // Base color depends on stress
+        // Normal: Grey (0x808080) -> Critical: Red (0xff0000)
+
+        let stressColor = 0x808080;
+        if (STRESS > 300) { stressColor = 0xff0000; } // Critical
+        else if (STRESS > 150) { stressColor = 0xffa500; } // Warning
+
+        const geometry = new THREE.BoxGeometry(1, 4, 1);
+        const material = new THREE.MeshPhongMaterial({
+            color: stressColor,
+            wireframe: false
+        });
+        const pillar = new THREE.Mesh(geometry, material);
+        scene.add(pillar);
+
+        // Grid helper
+        const gridHelper = new THREE.GridHelper(10, 10);
+        scene.add(gridHelper);
+
+        // Avoid infinite loop since we don't have requestAnimationFrame loop persisting across Python reruns nicely
+        // But for vibration effect, we can do a small local animation loop
+
+        let frame = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Simulation of Vibration
+            // We use the injected vibration values to jitter the pillar
+            const jitterScale = 0.1;
+            pillar.position.x = (Math.random() - 0.5) * VIB_X * jitterScale;
+            pillar.position.y = (Math.random() - 0.5) * VIB_Y * jitterScale;
+            pillar.position.z = (Math.random() - 0.5) * VIB_Z * jitterScale;
+
+            // Tilt
+            pillar.rotation.z = TILT * (Math.PI / 180); // Convert degrees to radians
+
+            controls.update();
+            renderer.render(scene, camera);
+            frame++;
+        }
+
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+
+</html>
