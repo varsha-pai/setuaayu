@@ -71,42 +71,67 @@
         dirLight.position.set(5, 10, 7);
         scene.add(dirLight);
 
-        // --- Bridge Pillar Geometry ---
-        // Base color depends on stress
-        // Normal: Grey (0x808080) -> Critical: Red (0xff0000)
+        // --- Bridge Geometry (Entire Span) ---
+        // We will create a multi-span bridge with deck and pillars.
 
-        let stressColor = 0x808080;
+        // Materials
+        let stressColor = 0x808080; // Gray
         if (STRESS > 300) { stressColor = 0xff0000; } // Critical
         else if (STRESS > 150) { stressColor = 0xffa500; } // Warning
 
-        const geometry = new THREE.BoxGeometry(1, 4, 1);
-        const material = new THREE.MeshPhongMaterial({
-            color: stressColor,
-            wireframe: false
-        });
-        const pillar = new THREE.Mesh(geometry, material);
-        scene.add(pillar);
+        const concreteMaterial = new THREE.MeshPhongMaterial({ color: stressColor });
+        const deckMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 }); // Darker road
+
+        const pillars = [];
+        const spans = 5;
+        const spacing = 4;
+
+        // Create Pillars & Deck
+        for (let i = 0; i < spans; i++) {
+            // Pillar
+            const pGeo = new THREE.BoxGeometry(0.8, 4, 0.8);
+            const pillar = new THREE.Mesh(pGeo, concreteMaterial);
+            pillar.position.set((i * spacing) - ((spans * spacing) / 2) + 2, 0, 0); // Center the bridge
+            pillar.castShadow = true;
+            scene.add(pillar);
+            pillars.push(pillar);
+
+            // Deck Segment (connecting on top)
+            const dGeo = new THREE.BoxGeometry(spacing + 0.2, 0.5, 2);
+            const deck = new THREE.Mesh(dGeo, deckMaterial);
+            deck.position.set(pillar.position.x, 2.25, 0); // Sit on top of pillar
+            scene.add(deck);
+        }
+
+        // Adjust Camera to see whole bridge
+        camera.position.set(0, 5, 12);
+        camera.lookAt(0, 0, 0);
 
         // Grid helper
-        const gridHelper = new THREE.GridHelper(10, 10);
+        const gridHelper = new THREE.GridHelper(40, 40);
         scene.add(gridHelper);
-
-        // Avoid infinite loop since we don't have requestAnimationFrame loop persisting across Python reruns nicely
-        // But for vibration effect, we can do a small local animation loop
 
         let frame = 0;
         function animate() {
             requestAnimationFrame(animate);
 
-            // Simulation of Vibration
-            // We use the injected vibration values to jitter the pillar
+            // Simulation of Vibration on ALL pillars (propagating wave effect)
             const jitterScale = 0.1;
-            pillar.position.x = (Math.random() - 0.5) * VIB_X * jitterScale;
-            pillar.position.y = (Math.random() - 0.5) * VIB_Y * jitterScale;
-            pillar.position.z = (Math.random() - 0.5) * VIB_Z * jitterScale;
 
-            // Tilt
-            pillar.rotation.z = TILT * (Math.PI / 180); // Convert degrees to radians
+            pillars.forEach((p, index) => {
+                // Wave offset based on index
+                const waveOffset = index * 0.5;
+
+                p.position.y = (Math.sin(frame * 0.1 + waveOffset) * VIB_Y * 0.5)
+                    + ((Math.random() - 0.5) * VIB_Y * jitterScale);
+
+                // X/Z Jitter
+                p.position.x = ((index * spacing) - ((spans * spacing) / 2) + 2) + ((Math.random() - 0.5) * VIB_X * jitterScale);
+                p.position.z = (Math.random() - 0.5) * VIB_Z * jitterScale;
+
+                // Tilt
+                p.rotation.z = TILT * (Math.PI / 180) * 0.5; // Scaled down tilt for entire structure
+            });
 
             controls.update();
             renderer.render(scene, camera);

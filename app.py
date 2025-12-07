@@ -137,23 +137,75 @@ else:
 
 simulation_mode = st.sidebar.radio("Simulation Mode", ["Normal", "Critical"])
 
+# --- Location Selector ---
+# Define locations list here or import it (defining here for simplicity and UI control)
+blr_locations = [
+    "Silk Board Junction Flyover",
+    "Hebbal Flyover Service Rd",
+    "KR Puram Suspension Bridge",
+    "Domlur Flyover",
+    "Yeshwanthpur Railway Overbridge",
+    "Madiwala Underpass"
+]
+
+# Real-world images for "Web Scraping" simulation
+bridge_images = {
+    "Silk Board Junction Flyover": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Silk_board_junction.jpg/1024px-Silk_board_junction.jpg",
+    "Hebbal Flyover Service Rd": "https://upload.wikimedia.org/wikipedia/commons/4/42/Hebbal_Flyover_Bangalore.jpg",
+    "KR Puram Suspension Bridge": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/K_R_Puram_Bridge.jpg/1200px-K_R_Puram_Bridge.jpg",
+    "Domlur Flyover": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Domlur_Flyover.jpg",
+    "Yeshwanthpur Railway Overbridge": "https://cf.bstatic.com/xdata/images/hotel/max1024x768/498114811.jpg?k=20f5c184478144214f4e38e670404439c28929ac747445c73860070119293673&o=&hp=1",
+    "Madiwala Underpass": "https://content.jdmagicbox.com/comp/bangalore/48/080p5005948/catalogue/madiwala-underpass-madiwala-bangalore-bridge-construction-contractors-3p9f5.jpg"
+}
+
+selected_location = st.sidebar.selectbox("Select Bridge Location", blr_locations)
+
+# --- Web Scraping & Twin Generation Module ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("🌐 Digital Twin Generator")
+scrape_btn = st.sidebar.button("🔍 Scrape Web & Reconstruct")
+
+scraped_image_url = None
+
+if scrape_btn:
+    with st.sidebar.status("Running OSINT Crawlers...", expanded=True) as status:
+        st.write("🕷️ Spawning bots on Google Images...")
+        time.sleep(1)
+        st.write(f"📂 Found 14 historical images for '{selected_location}'")
+        time.sleep(0.8)
+        st.write("📐 Triangulating Photogrammetry Points...")
+        time.sleep(1.2)
+        st.write("🧊 Constructing 3D Mesh...")
+        status.update(label="✅ Digital Twin Ready", state="complete", expanded=False)
+    
+    st.session_state['scraped_active'] = True
+    st.sidebar.success("Twin Synced with Live Data")
+    
+if st.session_state.get('scraped_active'):
+    # Show the "Scraped" image
+    st.sidebar.image(bridge_images.get(selected_location, "https://via.placeholder.com/300"), caption=f"Reference: {selected_location}", use_container_width=True)
+    scraped_image_url = bridge_images.get(selected_location)
+    model_ready = True # Enable the Twin view
+
 # Main Content - Live Metrics
 st.markdown("---")
-st.subheader(f"Live Sensor Telemetry: {'Generated Model #001' if model_ready else 'Default Asset'}")
+# Header with Location
+st.subheader(f"📍 Live Sensor Telemetry: {selected_location}")
+st.caption(f"Asset ID: {'TWIN-GEN-001' if st.session_state.get('scraped_active') else 'BLR-CIVIC-8842'} | Monitoring Node: Active")
 
 # Generate Data
-data_dict = generate_bridge_data(scenario=simulation_mode.lower())
+data_dict = generate_bridge_data(scenario=simulation_mode.lower(), location_name=selected_location) 
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.markdown(f"""
         <div class="metric-card">
             <h3>Vibration (g)</h3>
             <p style="font-size: 18px; color: {'#ff4b4b' if data_dict['vibration_x'] > 0.3 else '#00cc66'}">
-                X: {data_dict['vibration_x']}<br>
-                Y: {data_dict['vibration_y']}<br>
-                Z: {data_dict['vibration_z']}
+                x: {data_dict['vibration_x']}<br>
+                y: {data_dict['vibration_y']}<br>
+                z: {data_dict['vibration_z']}
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -161,10 +213,11 @@ with col1:
 with col2:
     st.markdown(f"""
         <div class="metric-card">
-            <h3>Strain (µε)</h3>
+            <h3>Stress (MPa)</h3>
             <p style="font-size: 32px; font-weight: bold; color: #3399ff">
-                {data_dict['strain']}
+                {data_dict['stress_mpa']}
             </p>
+            <span style="font-size:12px; color:#888">Legacy Strain: {data_dict['strain']}µε</span>
         </div>
     """, unsafe_allow_html=True)
 
@@ -174,6 +227,16 @@ with col3:
             <h3>Tilt (°)</h3>
             <p style="font-size: 32px; font-weight: bold; color: {'#ff4b4b' if abs(data_dict['tilt']) > 2.0 else '#00cc66'}">
                 {data_dict['tilt']}
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+with col4:
+    st.markdown(f"""
+        <div class="metric-card">
+            <h3>Traffic (PCU/hr)</h3>
+            <p style="font-size: 32px; font-weight: bold; color: {'#ff4b4b' if data_dict['traffic_load'] > 4000 else '#ffa500'}">
+                {data_dict['traffic_load']}
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -206,23 +269,70 @@ with col_drone:
     # --- Drone Scan / Upload Visuals ---
     st.markdown("### � Visual Inspection Input")
     
+    # Priority: Uploaded File > Location Image > Default Placeholder
+    display_img = "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=600&auto=format&fit=crop"
+    caption_text = "LiDAR Depth Map - Default"
+    
+    # Check if we have a specific image for this location
+    location_img_url = bridge_images.get(selected_location)
+
     if model_ready and uploaded_file is not None:
+        display_img = uploaded_file
+        caption_text = f"User Upload: {uploaded_file.name}"
         st.info(f"Analyzing: {uploaded_file.name}")
-        st.image(uploaded_file, caption="Source Architecture Image (Processed)", use_container_width=True)
+    elif location_img_url:
+        display_img = location_img_url
+        caption_text = f"Asset Reference: {selected_location}"
+        # Only show analyzing text if we are 'analyzing' (simulated)
+        if st.session_state.get('scraped_active'):
+             st.info(f"Analyzing Web Data for: {selected_location}")
         
-        # Simulated Vision Analysis Result
-        if simulation_mode == "Critical":
-            st.error("⚠️ Vision AI: Major Structural Cracks Detected")
-        else:
-            st.success("✅ Vision AI: No Surface Defects Found")
-            
+    st.image(display_img, caption=caption_text, use_container_width=True)
+
+    if simulation_mode == "Critical":
+        st.error(f"⚠️ Vision AI: Structural Defects Detected ({data_dict['defect_type']})")
     else:
-        st.info("Last Automated Scan: 2 Hours Ago")
-        # Placeholder for Drone Image
-        st.image("https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=600&auto=format&fit=crop", caption="LiDAR Depth Map - Pillar 7B", use_container_width=True)
-        st.markdown(f"**Visual Defect Detected:** {data_dict['defect_type']}")
+        st.success("✅ Vision AI: No Surface Defects Found")
 
 st.markdown("---")
+
+from datetime import datetime
+# --- REPORT GENERATION ---
+if st.button("📄 Generate Safety Audit Report"):
+    with st.spinner("Compiling Engineering Report..."):
+        time.sleep(1.5)
+        
+        report_text = f"""
+        # 🌉 SetuAayu STRUCTURAL SAFETY AUDIT REPORT
+        **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        **Asset:** {selected_location}
+        **Asset ID:** BLR-CIVIC-8842-TWIN
+        
+        ---
+        ## 1. TELEMETRY SUMMARY
+        - **Vibration:** {data_dict['vibration_x']}g (Max Axis)
+        - **Stress Load:** {data_dict['stress_mpa']} MPa
+        - **Traffic Volume:** {data_dict['traffic_load']} PCU/hr
+        
+        ## 2. AI SAFETY ASSESSMENT
+        - **Health Score:** {data_dict['health_score']}/100
+        - **Condition:** {'CRITICAL' if data_dict['health_score'] < 70 else 'OPTIMAL'}
+        - **Predicted Failure Window:** {data_dict['prediction_window']}
+        
+        ## 3. FUTURE CONDITION PREDICTION (AI PROJECTION)
+        Based on current stress accumulation of {data_dict['stress_mpa']} MPa/hr and traffic patterns:
+        - **3 Months:** {'Micro-fissures likely in Sector 4' if data_dict['health_score'] < 80 else 'No significant degradation expected.'}
+        - **1 Year:** {'Major rehabilitation required.' if data_dict['health_score'] < 60 else 'Routine maintenance sufficient.'}
+        
+        ## 4. RECOMMENDATIONS
+        1. {'Reduce traffic load immediately' if data_dict['traffic_load'] > 5000 else 'Maintain current traffic flow.'}
+        2. {'Schedule NDT (Non-Destructive Testing) this week' if data_dict['health_score'] < 70 else 'Next inspection due in 6 months.'}
+        
+        *Generated by SetuAayu AI Engine v1.0*
+        """
+        
+        st.text_area("Report Preview", report_text, height=400)
+        st.download_button("Download Report (PDF)", report_text, file_name=f"Report_{selected_location.replace(' ', '_')}.txt")
 
 import pickle
 import numpy as np
